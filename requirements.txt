@@ -2,3 +2,13 @@ fastapi
 uvicorn
 python-multipart
 google-cloud-vision
+sqlalchemy
+psycopg2-binary
+python-dotenv
+pydantic
+# AI Appeal Assistant (RAG)
+openai
+pgvector
+pypdf
+requests
+beautifulsoup4

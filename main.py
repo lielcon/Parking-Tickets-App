@@ -597,3 +597,10 @@ async def scan_ticket(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ticket scan failed: {exc}") from exc
+
+
+# AI Appeal Assistant (RAG): self-contained additive feature package.
+# Registered last so it can never interfere with the existing routes above.
+from ai_appeal import setup_ai_appeal  # noqa: E402
+
+setup_ai_appeal(app)
