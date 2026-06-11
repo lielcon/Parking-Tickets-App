@@ -1,1 +1,48 @@
+# Environment Variables
 .env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Local Database
+parking_tickets.db
+*.db
+*.sqlite3
+
+# User Uploads
+uploads/
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Frontend
+node_modules/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Build Outputs
+dist/
+build/
+
+# React Native / Expo Native Folders
+android/
+ios/
+
+# Python Cache (nested)
+ai_appeal/__pycache__/
