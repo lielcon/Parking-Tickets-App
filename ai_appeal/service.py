@@ -48,18 +48,75 @@ Strict rules:
    sections, or citations.
 2. If the excerpts do not clearly support an appeal, say so honestly and
    lower the appeal strength and confidence accordingly.
-3. Write "reasoning" and "recommended_action" in the same language as the
+3. First judge whether the user's explanation contains a coherent appeal
+   argument at all. If it is meaningless text, random characters, or contains
+   no recognizable appeal argument, set appeal_strength to "Weak" and
+   confidence to 0-5.
+4. Write "reasoning" and "recommended_action" in the same language as the
    user's explanation.
+
+Confidence calibration (reflect the quality of the argument, the available
+evidence, and the legal support found in the excerpts):
+- 0-5:   meaningless input, random characters, or no recognizable appeal argument
+- 6-10:  text is readable but contains no understandable argument, no evidence,
+         and no identifiable appeal basis
+- 11-45: understandable argument that points to a plausible appeal ground
+         (e.g. hidden signage, valid permit, emergency) but is vague, uncertain,
+         lacking specifics, or unsupported by evidence (Weak)
+- 46-79: specific, detailed account of what happened with partial legal support
+         from the excerpts (Medium)
+- 80-100: detailed account clearly and strongly supported by the legal excerpts,
+          ideally with evidence the user can present (Strong)
+
+Important calibration rules:
+- If the user states an identifiable appeal ground, even briefly and without
+  evidence, confidence must be at least 11 - the 0-10 range is reserved for
+  input with no recognizable appeal argument at all. Missing evidence alone
+  never puts confidence below 11 when the appeal ground is identifiable.
+- A brief, vague, or uncertain claim with no specifics and no evidence is Weak
+  with confidence at most 45, even if the appeal ground itself is plausible
+  and mentioned in the excerpts.
+
+Calibration examples:
+- "asdasd qweqwe 123123" -> Weak, confidence 0-5 (no recognizable argument)
+- "I think the sign was difficult to see." -> Weak, confidence 11-45
+  (identifiable ground: sign visibility; but vague, uncertain, no evidence)
+- A detailed account of a hidden sign with photos and dashcam footage,
+  supported by the excerpts -> Strong, confidence 80-100
 
 Respond with a single JSON object with exactly these keys:
 - "appeal_strength": one of "Strong", "Medium", "Weak"
-- "confidence": integer 0-100
+- "confidence": integer 0-100, calibrated according to the scale above and
+  consistent with appeal_strength
 - "reasoning": concise explanation grounded in the excerpts
 - "missing_evidence": array of strings (evidence the user should collect; may be empty)
 - "recommended_action": one practical next step for the user
 - "used_excerpt_indices": array of integers - the excerpt numbers you actually
   relied on (use only numbers that were provided)
 """
+
+# Allowed confidence range per appeal strength. The model is instructed to
+# follow this calibration; the clamp below guarantees consistency even if it
+# drifts (e.g. "Weak" with 70% confidence).
+CONFIDENCE_BANDS: dict[str, tuple[int, int]] = {
+    "Weak": (0, 45),
+    "Medium": (46, 79),
+    "Strong": (80, 100),
+}
+
+
+def _calibrate_confidence(appeal_strength: str, confidence: int) -> int:
+    """Clamp the model's confidence into the band for its appeal strength."""
+    low, high = CONFIDENCE_BANDS.get(appeal_strength, (0, 100))
+    calibrated = max(low, min(high, confidence))
+    if calibrated != confidence:
+        logger.info(
+            "Calibrated confidence %d -> %d to match appeal strength '%s'.",
+            confidence,
+            calibrated,
+            appeal_strength,
+        )
+    return calibrated
 
 
 def _build_query_text(ticket: TicketRef, user_explanation: str) -> str:
@@ -173,7 +230,7 @@ def analyze_appeal(
 
     response = AIAppealAnalysisResponse(
         appeal_strength=verdict.appeal_strength,
-        confidence=verdict.confidence,
+        confidence=_calibrate_confidence(verdict.appeal_strength, verdict.confidence),
         reasoning=verdict.reasoning,
         missing_evidence=verdict.missing_evidence,
         recommended_action=verdict.recommended_action,
